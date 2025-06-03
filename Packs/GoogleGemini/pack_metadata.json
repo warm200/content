@@ -3,7 +3,7 @@
     "description": "Google Gemini Large Language Model Integration for AI-powered analysis and chat capabilities in XSOAR",
     "support": "developer",
     "currentVersion": "1.0.0",
-    "author": "USTLD - A&E",
+    "author": "Mu Wang",
     "url": "",
     "email": "",
     "categories": [
@@ -38,5 +38,5 @@
     ],
     "marketplaces": [
     ],
-    "githubUser": []
+    "githubUser": ["warm200"]
 }
