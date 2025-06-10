@@ -24,6 +24,10 @@ def client_fixture(mocker):
         proxy=False,
         api_key="test_api_key",
         model="gemini-2.0-flash",
+        max_tokens=1024,
+        temperature=0.7,
+        top_p=None,
+        top_k=None,
     )
     mocker.patch.object(client, "_http_request")
     return client
@@ -44,21 +48,30 @@ MOCK_NO_TEXT_RESPONSE = {"candidates": [{"content": {"parts": []}}]}
 def test_client_init():
     """Test Client initialization with all parameters"""
     client = GoogleGemini.Client(
-        base_url="https://test.com", verify=False, proxy=True, api_key="test_key", model="gemini-1.5-pro"
+        base_url="https://test.com", verify=False, proxy=True, api_key="test_key", model="gemini-1.5-pro",
+        max_tokens=2048, temperature=0.8, top_p=0.9, top_k=40
     )
 
     assert client.api_key == "test_key"
     assert client.model == "gemini-1.5-pro"
+    assert client.max_tokens == 2048
+    assert client.temperature == 0.8
+    assert client.top_p == 0.9
+    assert client.top_k == 40
     assert client._headers["x-goog-api-key"] == "test_key"
     assert client._headers["Content-Type"] == "application/json"
     assert client._headers["Accept"] == "application/json"
 
 
 def test_client_init_default_model():
-    """Test Client initialization with default model"""
+    """Test Client initialization with default model and parameters"""
     client = GoogleGemini.Client(base_url="https://test.com", verify=True, proxy=False, api_key="test_key")
 
     assert client.model == "gemini-2.5-flash-preview-05-20"
+    assert client.max_tokens == 1024
+    assert client.temperature is None
+    assert client.top_p is None
+    assert client.top_k is None
 
 
 def test_send_chat_message_success(client_fixture):
@@ -66,7 +79,7 @@ def test_send_chat_message_success(client_fixture):
     client_fixture._http_request.return_value = MOCK_SUCCESSFUL_CHAT_RESPONSE
 
     result = client_fixture.send_chat_message(
-        prompt="Hello, how are you?", model="gemini-2.0-flash", max_tokens=500, temperature=0.5
+        prompt="Hello, how are you?", model="gemini-2.0-flash"
     )
 
     assert result == MOCK_SUCCESSFUL_CHAT_RESPONSE
@@ -75,7 +88,7 @@ def test_send_chat_message_success(client_fixture):
         url_suffix="/v1beta/models/gemini-2.0-flash:generateContent",
         json_data={
             "contents": [{"role": "user", "parts": [{"text": "Hello, how are you?"}]}],
-            "generationConfig": {"maxOutputTokens": 500, "temperature": 0.5},
+            "generationConfig": {"maxOutputTokens": 1024, "temperature": 0.7},
         },
         resp_type="json",
         ok_codes=(200,),
@@ -134,7 +147,7 @@ def test_test_module_exception(client_fixture):
 def test_googlegemini_chat_command_success(client_fixture):
     """Test googlegemini_chat_command with successful response"""
     client_fixture._http_request.return_value = MOCK_SUCCESSFUL_CHAT_RESPONSE
-    args = {"prompt": "What is AI?", "model": "gemini-2.0-flash", "max_tokens": 1000, "temperature": 0.8}
+    args = {"prompt": "What is AI?", "model": "gemini-2.0-flash"}
 
     result = GoogleGemini.googlegemini_chat_command(client_fixture, args)
 
@@ -143,7 +156,6 @@ def test_googlegemini_chat_command_success(client_fixture):
     assert result.outputs["prompt"] == "What is AI?"
     assert result.outputs["response"] == "Hello! This is a test response from Gemini."
     assert result.outputs["model"] == "gemini-2.0-flash"
-    assert result.outputs["temperature"] == 0.8
     assert result.readable_output == "Hello! This is a test response from Gemini."
 
 
@@ -245,11 +257,10 @@ def test_googlegemini_chat_command_default_values(client_fixture):
     result = GoogleGemini.googlegemini_chat_command(client_fixture, args)
 
     assert result.outputs["model"] == client_fixture.model
-    assert result.outputs["temperature"] == 0.7
 
-    # Check that default values were used in the API call
+    # Check that instance default values were used in the API call
     call_args = client_fixture._http_request.call_args[1]["json_data"]
-    assert call_args["generationConfig"]["maxOutputTokens"] == 10000
+    assert call_args["generationConfig"]["maxOutputTokens"] == 1024
     assert call_args["generationConfig"]["temperature"] == 0.7
 
 
@@ -264,6 +275,11 @@ def demisto_mocker_fixture(mocker):
             "url": "https://generativelanguage.googleapis.com",
             "api_key": "test_api_key",
             "model": "gemini-2.0-flash",
+            "model-freetext": "",
+            "max_tokens": "1024",
+            "temperature": "0.7",
+            "top_p": "",
+            "top_k": "",
             "insecure": False,
             "proxy": False,
         },
@@ -317,7 +333,13 @@ def test_main_missing_api_key(mocker):
         demisto,
         "params",
         return_value={
-            "url": "https://generativelanguage.googleapis.com"
+            "url": "https://generativelanguage.googleapis.com",
+            "model": "gemini-2.0-flash",
+            "model-freetext": "",
+            "max_tokens": "1024",
+            "temperature": "",
+            "top_p": "",
+            "top_k": ""
             # Missing api_key
         },
     )
@@ -345,6 +367,110 @@ def test_main_exception_handling(demisto_mocker_fixture, mocker):
     assert "Test error" in args[0]
 
 
+def test_main_model_freetext_override(mocker):
+    """Test main function when model-freetext overrides dropdown selection"""
+    mocker.patch.object(GoogleGemini, "demisto", demisto)
+    mocker.patch.object(
+        demisto,
+        "params",
+        return_value={
+            "url": "https://generativelanguage.googleapis.com",
+            "api_key": "test_api_key",
+            "model": "gemini-2.0-flash",
+            "model-freetext": "gemini-1.5-pro",
+            "max_tokens": "2048",
+            "temperature": "0.8",
+            "top_p": "0.9",
+            "top_k": "40",
+            "insecure": False,
+            "proxy": False,
+        },
+    )
+    mocker.patch.object(demisto, "args", return_value={})
+    mocker.patch.object(demisto, "command", return_value="test-module")
+    mock_test_module = mocker.patch.object(GoogleGemini, "test_module", return_value="ok")
+    mocker.patch.object(GoogleGemini, "return_results")
+
+    GoogleGemini.main()
+
+    mock_test_module.assert_called_once()
+    client_arg = mock_test_module.call_args[0][0]
+    assert client_arg.model == "gemini-1.5-pro"
+    assert client_arg.max_tokens == 2048
+    assert client_arg.temperature == 0.8
+    assert client_arg.top_p == 0.9
+    assert client_arg.top_k == 40
+
+
+def test_main_model_dropdown_fallback(mocker):
+    """Test main function when model-freetext is empty and falls back to dropdown"""
+    mocker.patch.object(GoogleGemini, "demisto", demisto)
+    mocker.patch.object(
+        demisto,
+        "params",
+        return_value={
+            "url": "https://generativelanguage.googleapis.com",
+            "api_key": "test_api_key",
+            "model": "gemini-2.0-flash",
+            "model-freetext": "",
+            "max_tokens": "1024",
+            "temperature": "",
+            "top_p": "",
+            "top_k": "",
+            "insecure": False,
+            "proxy": False,
+        },
+    )
+    mocker.patch.object(demisto, "args", return_value={})
+    mocker.patch.object(demisto, "command", return_value="test-module")
+    mock_test_module = mocker.patch.object(GoogleGemini, "test_module", return_value="ok")
+    mocker.patch.object(GoogleGemini, "return_results")
+
+    GoogleGemini.main()
+
+    # Verify the client was created with the dropdown model
+    mock_test_module.assert_called_once()
+    client_arg = mock_test_module.call_args[0][0]
+    assert client_arg.model == "gemini-2.0-flash"
+    assert client_arg.max_tokens == 1024
+    assert client_arg.temperature is None
+    assert client_arg.top_p is None
+    assert client_arg.top_k is None
+
+
+def test_main_model_default_fallback(mocker):
+    """Test main function when both model fields are empty and falls back to default"""
+    mocker.patch.object(GoogleGemini, "demisto", demisto)
+    mocker.patch.object(
+        demisto,
+        "params",
+        return_value={
+            "url": "https://generativelanguage.googleapis.com",
+            "api_key": "test_api_key",
+            "model": "",
+            "model-freetext": "",
+            "max_tokens": "512",
+            "temperature": "",
+            "top_p": "",
+            "top_k": "",
+            "insecure": False,
+            "proxy": False,
+        },
+    )
+    mocker.patch.object(demisto, "args", return_value={})
+    mocker.patch.object(demisto, "command", return_value="test-module")
+    mock_test_module = mocker.patch.object(GoogleGemini, "test_module", return_value="ok")
+    mocker.patch.object(GoogleGemini, "return_results")
+
+    GoogleGemini.main()
+
+    # Verify the client was created with the default model
+    mock_test_module.assert_called_once()
+    client_arg = mock_test_module.call_args[0][0]
+    assert client_arg.model == "gemini-2.5-flash-preview-05-20"
+    assert client_arg.max_tokens == 512
+
+
 def test_supported_models_list():
     """Test that SUPPORTED_MODELS contains expected models"""
     assert "gemini-2.0-flash" in GoogleGemini.SUPPORTED_MODELS
@@ -353,14 +479,61 @@ def test_supported_models_list():
     assert len(GoogleGemini.SUPPORTED_MODELS) > 10  # Should have multiple models
 
 
-def test_googlegemini_chat_command_max_tokens_conversion(client_fixture):
-    """Test googlegemini_chat_command properly converts max_tokens argument"""
-    client_fixture._http_request.return_value = MOCK_SUCCESSFUL_CHAT_RESPONSE
+def test_send_chat_message_with_instance_parameters():
+    """Test that send_chat_message uses instance parameters correctly"""
+    client = GoogleGemini.Client(
+        base_url="https://test.com",
+        verify=True,
+        proxy=False,
+        api_key="test_key",
+        model="gemini-1.5-pro",
+        max_tokens=2048,
+        temperature=0.8,
+        top_p=0.9,
+        top_k=40
+    )
+    
+    # Mock the HTTP request
+    import unittest.mock
+    with unittest.mock.patch.object(client, '_http_request') as mock_request:
+        mock_request.return_value = MOCK_SUCCESSFUL_CHAT_RESPONSE
+        
+        client.send_chat_message("Test prompt")
+        
+        # Verify the generation config includes all instance parameters
+        call_args = mock_request.call_args[1]["json_data"]
+        generation_config = call_args["generationConfig"]
+        assert generation_config["maxOutputTokens"] == 2048
+        assert generation_config["temperature"] == 0.8
+        assert generation_config["topP"] == 0.9
+        assert generation_config["topK"] == 40
 
-    # Test with string that can be converted to number
-    args = {"prompt": "Test prompt", "max_tokens": "5000"}
 
-    GoogleGemini.googlegemini_chat_command(client_fixture, args)
-
-    call_args = client_fixture._http_request.call_args[1]["json_data"]
-    assert call_args["generationConfig"]["maxOutputTokens"] == 5000
+def test_send_chat_message_with_optional_parameters_none():
+    """Test that send_chat_message only includes configured parameters"""
+    client = GoogleGemini.Client(
+        base_url="https://test.com",
+        verify=True,
+        proxy=False,
+        api_key="test_key",
+        model="gemini-1.5-pro",
+        max_tokens=1024,
+        temperature=None,
+        top_p=None,
+        top_k=None
+    )
+    
+    # Mock the HTTP request
+    import unittest.mock
+    with unittest.mock.patch.object(client, '_http_request') as mock_request:
+        mock_request.return_value = MOCK_SUCCESSFUL_CHAT_RESPONSE
+        
+        client.send_chat_message("Test prompt")
+        
+        # Verify the generation config only includes maxOutputTokens
+        call_args = mock_request.call_args[1]["json_data"]
+        generation_config = call_args["generationConfig"]
+        assert generation_config["maxOutputTokens"] == 1024
+        assert "temperature" not in generation_config
+        assert "topP" not in generation_config
+        assert "topK" not in generation_config
