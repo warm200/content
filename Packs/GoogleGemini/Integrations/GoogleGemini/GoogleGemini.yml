@@ -85,43 +85,43 @@ configuration:
   type: 8
 description: |-
   Google Gemini LLM Integration for AI-powered analysis and chat capabilities.
-  
+
   This integration provides access to Google's Gemini large language models for:
   - AI-powered chat conversations
   - Text analysis and generation
   - Natural language processing tasks
-  
+
   Supported models include Gemini 2.0 Flash, Gemini 1.5 Pro, and various preview models.
 display: Google Gemini
 name: GoogleGemini
 script:
   commands:
   - arguments:
-    - description: The prompt or question to send to the AI model
+    - description: The prompt or question to send to the AI model.
       name: prompt
       required: true
     - description: The Gemini model to use for this request. If not specified, uses the default model from configuration.
-            name: model
+      name: model
       required: false
     - description: |-
         Optional conversation history in JSON format. Array of message objects with 'role' (user/model) and 'parts' containing text.
-        Example: [{"role": "user", "parts": [{"text": "Hello"}]}, {"role": "model", "parts": [{"text": "Hi there!"}]}]
+        Example: [{"role": "user", "parts": [{"text": "Hello"}]}, {"role": "model", "parts": [{"text": "Hi there!"}]}].
       name: history
       required: false
-    description: Send a chat message to the Gemini AI model
+    description: Send a chat message to the Gemini AI model.
     name: google-gemini-send-message
     outputs:
     - contextPath: GoogleGemini.Chat.prompt
-      description: The original prompt sent to the model
+      description: The original prompt sent to the model.
       type: String
     - contextPath: GoogleGemini.Chat.response
-      description: The AI model's response
+      description: The AI model's response.
       type: String
     - contextPath: GoogleGemini.Chat.model
-      description: The model used for generation
+      description: The model used for generation.
       type: String
     - contextPath: GoogleGemini.Chat.temperature
-      description: The temperature setting used
+      description: The temperature setting used.
       type: Number
   dockerimage: demisto/python3:3.12.8.3296088
   runonce: false
@@ -129,5 +129,5 @@ script:
   subtype: python3
   type: python
 tests:
-- No tests
+- playbook-GoogleGemini_Test
 fromversion: 6.10.0

@@ -3,14 +3,15 @@
 This integration provides AI-powered analysis and chat capabilities for XSOAR users.
 """
 
-from typing import Any
-import json
-
 import demistomock as demisto
 from CommonServerPython import *  # noqa # pylint: disable=unused-wildcard-import
 from CommonServerUserPython import *  # noqa
 
+""" IMPORTS """
+import json
+from typing import Any
 
+""" CONSTANTS """
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"  # ISO8601
 SUPPORTED_MODELS = [
     # Stable models
@@ -38,8 +39,18 @@ class Client(BaseClient):
     It inherits from BaseClient which handles proxy, SSL verification, etc.
     """
 
-    def __init__(self, base_url: str, verify: bool, proxy: bool, api_key: str, model: str = "gemini-2.5-flash-preview-05-20", 
-                 max_tokens: int = 1024, temperature: float | None = None, top_p: float | None = None, top_k: int | None = None):
+    def __init__(
+        self,
+        base_url: str,
+        verify: bool,
+        proxy: bool,
+        api_key: str,
+        model: str = "gemini-2.5-flash-preview-05-20",
+        max_tokens: int = 1024,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+    ):
         """Initialize Client class.
 
         :param base_url: The base URL of the Gemini API.
@@ -99,8 +110,8 @@ class Client(BaseClient):
         contents.append({"role": "user", "parts": [{"text": prompt}]})
 
         # Build generation config using instance defaults
-        generation_config = {"maxOutputTokens": self.max_tokens}
-        
+        generation_config: dict[str, Any] = {"maxOutputTokens": self.max_tokens}
+
         # Add optional parameters if they were configured in the instance
         if self.temperature is not None:
             generation_config["temperature"] = self.temperature
@@ -212,19 +223,19 @@ def main():
     model_freetext = params.get("model-freetext", "").strip()
     model_dropdown = params.get("model", "").strip()
     model = model_freetext or model_dropdown or "gemini-2.5-flash-preview-05-20"
-    
+
     max_tokens = arg_to_number(params.get("max_tokens", 1024)) or 1024
-    
+
     # Handle optional parameters - use defaults if empty or not provided
     temperature_val = params.get("temperature", "").strip()
     temperature = float(temperature_val) if temperature_val else None
-    
+
     top_p_val = params.get("top_p", "").strip()
     top_p = float(top_p_val) if top_p_val else None
-    
+
     top_k_val = params.get("top_k", "").strip()
     top_k = int(top_k_val) if top_k_val else None
-    
+
     if not api_key:
         return_error("API key is not configured. Please configure it in the instance settings.")
         return
@@ -234,15 +245,15 @@ def main():
 
     try:
         client = Client(
-            base_url=base_url, 
-            verify=verify_certificate, 
-            proxy=proxy, 
-            api_key=api_key, 
+            base_url=base_url,
+            verify=verify_certificate,
+            proxy=proxy,
+            api_key=api_key,
             model=model,
             max_tokens=max_tokens,
             temperature=temperature,
             top_p=top_p,
-            top_k=top_k
+            top_k=top_k,
         )
         args = demisto.args()
 

@@ -48,8 +48,15 @@ MOCK_NO_TEXT_RESPONSE = {"candidates": [{"content": {"parts": []}}]}
 def test_client_init():
     """Test Client initialization with all parameters"""
     client = GoogleGemini.Client(
-        base_url="https://test.com", verify=False, proxy=True, api_key="test_key", model="gemini-1.5-pro",
-        max_tokens=2048, temperature=0.8, top_p=0.9, top_k=40
+        base_url="https://test.com",
+        verify=False,
+        proxy=True,
+        api_key="test_key",
+        model="gemini-1.5-pro",
+        max_tokens=2048,
+        temperature=0.8,
+        top_p=0.9,
+        top_k=40,
     )
 
     assert client.api_key == "test_key"
@@ -78,9 +85,7 @@ def test_send_chat_message_success(client_fixture):
     """Test successful chat message sending"""
     client_fixture._http_request.return_value = MOCK_SUCCESSFUL_CHAT_RESPONSE
 
-    result = client_fixture.send_chat_message(
-        prompt="Hello, how are you?", model="gemini-2.0-flash"
-    )
+    result = client_fixture.send_chat_message(prompt="Hello, how are you?", model="gemini-2.0-flash")
 
     assert result == MOCK_SUCCESSFUL_CHAT_RESPONSE
     client_fixture._http_request.assert_called_once_with(
@@ -185,7 +190,7 @@ def test_google_gemini_send_message_command_unsupported_model(client_fixture):
 
     # Should not raise an error, but issue a warning and continue
     result = GoogleGemini.google_gemini_send_message_command(client_fixture, args)
-    
+
     assert isinstance(result, CommandResults)
     assert result.outputs_key_field == "prompt"
     assert result.outputs["prompt"] == "Test prompt"
@@ -359,7 +364,7 @@ def test_main_missing_api_key(mocker):
             "max_tokens": "1024",
             "temperature": "",
             "top_p": "",
-            "top_k": ""
+            "top_k": "",
             # Missing api_key
         },
     )
@@ -513,16 +518,17 @@ def test_send_chat_message_with_instance_parameters():
         max_tokens=2048,
         temperature=0.8,
         top_p=0.9,
-        top_k=40
+        top_k=40,
     )
-    
+
     # Mock the HTTP request
     import unittest.mock
-    with unittest.mock.patch.object(client, '_http_request') as mock_request:
+
+    with unittest.mock.patch.object(client, "_http_request") as mock_request:
         mock_request.return_value = MOCK_SUCCESSFUL_CHAT_RESPONSE
-        
+
         client.send_chat_message("Test prompt")
-        
+
         # Verify the generation config includes all instance parameters
         call_args = mock_request.call_args[1]["json_data"]
         generation_config = call_args["generationConfig"]
@@ -543,16 +549,17 @@ def test_send_chat_message_with_optional_parameters_none():
         max_tokens=1024,
         temperature=None,
         top_p=None,
-        top_k=None
+        top_k=None,
     )
-    
+
     # Mock the HTTP request
     import unittest.mock
-    with unittest.mock.patch.object(client, '_http_request') as mock_request:
+
+    with unittest.mock.patch.object(client, "_http_request") as mock_request:
         mock_request.return_value = MOCK_SUCCESSFUL_CHAT_RESPONSE
-        
+
         client.send_chat_message("Test prompt")
-        
+
         # Verify the generation config only includes maxOutputTokens
         call_args = mock_request.call_args[1]["json_data"]
         generation_config = call_args["generationConfig"]
