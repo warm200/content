@@ -13,7 +13,7 @@ from CommonServerUserPython import *  # noqa
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"  # ISO8601
 SUPPORTED_MODELS = [
-    # Current stable Gemini models
+    # Stable models
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
@@ -21,13 +21,12 @@ SUPPORTED_MODELS = [
     "gemini-1.5-pro",
     # Preview models
     "gemini-2.5-flash-preview-05-20",
-    "gemini-2.5-pro-preview-05-06",
+    "gemini-2.5-pro-preview-06-05",
     "gemini-2.0-flash-preview-image-generation",
-    # Native audio models
-    "gemini-2.5-flash-preview-native-audio-dialog",
-    "gemini-2.5-flash-exp-native-audio-thinking-dialog",
-    # Embedding and specialized models
+    # Embedding models
     "text-embedding-004",
+    "models/embedding-001",
+    # Other specialized models
     "models/aqa",
 ]
 

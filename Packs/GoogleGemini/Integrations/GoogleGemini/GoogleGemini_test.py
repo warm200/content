@@ -496,7 +496,10 @@ def test_supported_models_list():
     assert "gemini-2.0-flash" in GoogleGemini.SUPPORTED_MODELS
     assert "gemini-1.5-pro" in GoogleGemini.SUPPORTED_MODELS
     assert "gemini-1.5-flash" in GoogleGemini.SUPPORTED_MODELS
-    assert len(GoogleGemini.SUPPORTED_MODELS) > 10  # Should have multiple models
+    assert "gemini-2.5-pro-preview-06-05" in GoogleGemini.SUPPORTED_MODELS
+    assert "text-embedding-004" in GoogleGemini.SUPPORTED_MODELS
+    assert "models/embedding-001" in GoogleGemini.SUPPORTED_MODELS
+    assert len(GoogleGemini.SUPPORTED_MODELS) == 11
 
 
 def test_send_chat_message_with_instance_parameters():
