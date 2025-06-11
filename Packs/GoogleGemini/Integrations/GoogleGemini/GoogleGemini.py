@@ -146,7 +146,7 @@ def google_gemini_send_message_command(client: Client, args: dict[str, Any]):
     :return: CommandResults object with outputs and readable representation.
     """
     prompt = str(args.get("prompt", ""))
-    model = args.get("model", "") if args.get("model") else None
+    model = args.get("model", None)
     history_arg = args.get("history", [])
 
     if not prompt:
@@ -171,12 +171,15 @@ def google_gemini_send_message_command(client: Client, args: dict[str, Any]):
         raise Exception(f"API Error: {response.get('error')}")
 
     content = ""
-    if response.get("candidates") and len(response["candidates"]) > 0:
-        candidate = response["candidates"][0]
-        if candidate.get("content") and candidate["content"].get("parts"):
-            parts = candidate["content"]["parts"]
-            if len(parts) > 0 and parts[0].get("text"):
-                content = parts[0]["text"]
+    if (candidates := response.get("candidates")) and len(candidates) > 0:
+        candidate = candidates[0]
+        if (
+            (content_part := candidate.get("content"))
+            and (parts := content_part.get("parts"))
+            and len(parts) > 0
+            and (text := parts[0].get("text"))
+        ):
+            content = text
 
     if not content:
         content = "No response generated."
