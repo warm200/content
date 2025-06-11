@@ -39,7 +39,8 @@ class Client(BaseClient):
     It inherits from BaseClient which handles proxy, SSL verification, etc.
     """
 
-    def __init__(self, base_url: str, verify: bool, proxy: bool, api_key: str, model: str = "gemini-2.5-flash-preview-05-20"):
+    def __init__(self, base_url: str, verify: bool, proxy: bool, api_key: str, model: str = "gemini-2.5-flash-preview-05-20", 
+                 max_tokens: int = 1024, temperature: float | None = None, top_p: float | None = None, top_k: int | None = None):
         """Initialize Client class.
 
         :param base_url: The base URL of the Gemini API.
@@ -47,10 +48,18 @@ class Client(BaseClient):
         :param proxy: Whether to use system proxy settings.
         :param api_key: The API key for authentication.
         :param model: The default Gemini model to use for requests.
+        :param max_tokens: Default maximum tokens for responses.
+        :param temperature: Default temperature for response generation.
+        :param top_p: Default top-p value for response generation.
+        :param top_k: Default top-k value for response generation.
         """
         super().__init__(base_url=base_url, verify=verify, proxy=proxy)
         self.api_key = api_key
         self.model = model
+        self.max_tokens = max_tokens
+        self.temperature = temperature
+        self.top_p = top_p
+        self.top_k = top_k
         self._headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
@@ -61,8 +70,6 @@ class Client(BaseClient):
         self,
         prompt: str,
         model: str | None = None,
-        max_tokens: int = 10000,
-        temperature: float = 0.7,
         history: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Send a chat message to the Gemini API with optional conversation history.
@@ -80,8 +87,6 @@ class Client(BaseClient):
         ]
         :param prompt: The user's prompt/question.
         :param model: The Gemini model to use (defaults to instance default).
-        :param max_tokens: Maximum tokens in the response.
-        :param temperature: Temperature for response generation (0.0 to 1.0).
         :param history: Optional conversation history in Gemini format.
         :return: Dictionary containing the API response.
         """
@@ -94,10 +99,25 @@ class Client(BaseClient):
         # Add current user prompt
         contents.append({"role": "user", "parts": [{"text": prompt}]})
 
-        request_body = {"contents": contents, "generationConfig": {"maxOutputTokens": max_tokens, "temperature": temperature}}
+        # Build generation config using instance defaults
+        generation_config = {"maxOutputTokens": self.max_tokens}
+        
+        # Add optional parameters if they were configured in the instance
+        if self.temperature is not None:
+            generation_config["temperature"] = self.temperature
+        if self.top_p is not None:
+            generation_config["topP"] = self.top_p
+        if self.top_k is not None:
+            generation_config["topK"] = self.top_k
+
+        request_body = {"contents": contents, "generationConfig": generation_config}
 
         return self._http_request(
-            method="POST", url_suffix=f"/v1beta/models/{selected_model}:generateContent", json_data=request_body, ok_codes=(200,)
+            method="POST",
+            url_suffix=f"/v1beta/models/{selected_model}:generateContent",
+            json_data=request_body,
+            resp_type="json",
+            ok_codes=(200,),
         )
 
 
@@ -110,7 +130,7 @@ def test_module(client: Client) -> str:
     :return: 'ok' if successful, or an error message string.
     """
     try:
-        response = client.send_chat_message("Hello, please respond with 'OK' to test connectivity.", max_tokens=10)
+        response = client.send_chat_message("Hello, please respond with 'OK' to test connectivity.")
         if response.get("error"):
             raise Exception(response.get("error"))
         return "ok"
@@ -118,29 +138,22 @@ def test_module(client: Client) -> str:
         return f"An unexpected error occurred during connectivity test: {str(e)}"
 
 
-def googlegemini_chat_command(client: Client, args: dict[str, Any]):
+def google_gemini_send_message_command(client: Client, args: dict[str, Any]):
     """Command function to send a chat message to the Google Gemini API with optional conversation history.
 
     :param client: Google Gemini API client.
-    :param args: Dictionary of command arguments (prompt, model, max_tokens, temperature, history).
+    :param args: Dictionary of command arguments (prompt, model, history).
     :return: CommandResults object with outputs and readable representation.
     """
     prompt = str(args.get("prompt", ""))
-    model = args.get("model", None)
-    max_tokens = arg_to_number(args.get("max_tokens", 10000)) or 10000
-    temperature = float(args.get("temperature", 0.7))
+    model = args.get("model", "") if args.get("model") else None
     history_arg = args.get("history", [])
 
     if not prompt:
         raise ValueError("The 'prompt' argument is required.")
 
     if model and model not in SUPPORTED_MODELS:
-        warning_message = (
-            f"Warning: Model '{model}' is not in the list of officially supported models by this integration version. "
-            f"Attempting to use it, but it may not work as expected or could be deprecated. "
-            f"Known models at the time of this integration version are: {', '.join(SUPPORTED_MODELS)}"
-        )
-        return_warning(warning_message)  # Posts to War Room and continues
+        raise ValueError(f"Unsupported model: {model}. Supported Gemini models are: {', '.join(SUPPORTED_MODELS)}")
 
     history = []
     if history_arg:
@@ -152,29 +165,26 @@ def googlegemini_chat_command(client: Client, args: dict[str, Any]):
         except json.JSONDecodeError:
             raise ValueError("History must be valid JSON array of conversation objects.")
 
-    response = client.send_chat_message(prompt, model, max_tokens, temperature, history)
+    response = client.send_chat_message(prompt, model, history)
 
     if response.get("error"):
         raise Exception(f"API Error: {response.get('error')}")
 
     content = ""
-    if (candidates := response.get("candidates")) and len(candidates) > 0:
-        candidate = candidates[0]
-        if (
-            (content_part := candidate.get("content"))
-            and (parts := content_part.get("parts"))
-            and len(parts) > 0
-            and (text := parts[0].get("text"))
-        ):
-            content = text
+    if response.get("candidates") and len(response["candidates"]) > 0:
+        candidate = response["candidates"][0]
+        if candidate.get("content") and candidate["content"].get("parts"):
+            parts = candidate["content"]["parts"]
+            if len(parts) > 0 and parts[0].get("text"):
+                content = parts[0]["text"]
 
     if not content:
         content = "No response generated."
 
     return CommandResults(
         outputs_prefix="GoogleGemini.Chat",
-        outputs_key_field="",
-        outputs={"prompt": prompt, "response": content, "model": model or client.model, "temperature": temperature},
+        outputs_key_field="prompt",
+        outputs={"prompt": prompt, "response": content, "model": model or client.model},
         raw_response=response,
         readable_output=content,
     )
@@ -191,8 +201,23 @@ def main():
     verify_certificate = not argToBoolean(params.get("insecure", False))
     proxy = argToBoolean(params.get("proxy", False))
     api_key = params.get("api_key")
-    model = params.get("model", "gemini-2.5-flash-preview-05-20")
-
+    # Use freetext model if provided, otherwise use dropdown selection
+    model_freetext = params.get("model-freetext", "").strip()
+    model_dropdown = params.get("model", "").strip()
+    model = model_freetext or model_dropdown or "gemini-2.5-flash-preview-05-20"
+    
+    max_tokens = arg_to_number(params.get("max_tokens", 1024)) or 1024
+    
+    # Handle optional parameters - use defaults if empty or not provided
+    temperature_val = params.get("temperature", "").strip()
+    temperature = float(temperature_val) if temperature_val else None
+    
+    top_p_val = params.get("top_p", "").strip()
+    top_p = float(top_p_val) if top_p_val else None
+    
+    top_k_val = params.get("top_k", "").strip()
+    top_k = int(top_k_val) if top_k_val else None
+    
     if not api_key:
         return_error("API key is not configured. Please configure it in the instance settings.")
         return
@@ -201,13 +226,23 @@ def main():
     demisto.debug(f"Command being called is {command}")
 
     try:
-        client = Client(base_url=base_url, verify=verify_certificate, proxy=proxy, api_key=api_key, model=model)
+        client = Client(
+            base_url=base_url, 
+            verify=verify_certificate, 
+            proxy=proxy, 
+            api_key=api_key, 
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k
+        )
         args = demisto.args()
 
         if command == "test-module":
             result = test_module(client)
-        elif command == "googlegemini-chat":
-            result = googlegemini_chat_command(client, args)
+        elif command == "google-gemini-send-message":
+            result = google_gemini_send_message_command(client, args)
         else:
             raise NotImplementedError(f"Command {command} is not implemented")
 
