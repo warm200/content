@@ -153,7 +153,12 @@ def google_gemini_send_message_command(client: Client, args: dict[str, Any]):
         raise ValueError("The 'prompt' argument is required.")
 
     if model and model not in SUPPORTED_MODELS:
-        raise ValueError(f"Unsupported model: {model}. Supported Gemini models are: {', '.join(SUPPORTED_MODELS)}")
+        warning_message = (
+            f"Warning: Model '{model}' is not in the list of officially supported models by this integration version. "
+            f"Attempting to use it, but it may not work as expected or could be deprecated. "
+            f"Known models at the time of this integration version are: {', '.join(SUPPORTED_MODELS)}"
+        )
+        return_warning(warning_message)
 
     history = []
     if history_arg:

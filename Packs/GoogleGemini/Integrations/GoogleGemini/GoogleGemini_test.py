@@ -144,6 +144,15 @@ def test_test_module_exception(client_fixture):
     assert "An unexpected error occurred during connectivity test: Connection failed" in result
 
 
+def test_test_module_api_error(client_fixture):
+    """Test test_module function with API error response"""
+    client_fixture._http_request.return_value = {"error": {"message": "Invalid API key"}}
+
+    result = GoogleGemini.test_module(client_fixture)
+
+    assert "An unexpected error occurred during connectivity test: {'message': 'Invalid API key'}" in result
+
+
 def test_google_gemini_send_message_command_success(client_fixture):
     """Test google_gemini_send_message_command with successful response"""
     client_fixture._http_request.return_value = MOCK_SUCCESSFUL_CHAT_RESPONSE
@@ -171,11 +180,16 @@ def test_google_gemini_send_message_command_missing_prompt(client_fixture):
 
 def test_google_gemini_send_message_command_unsupported_model(client_fixture):
     """Test google_gemini_send_message_command with unsupported model"""
+    client_fixture._http_request.return_value = MOCK_SUCCESSFUL_CHAT_RESPONSE
     args = {"prompt": "Test prompt", "model": "unsupported-model"}
 
-    with pytest.raises(ValueError) as e:
-        GoogleGemini.google_gemini_send_message_command(client_fixture, args)
-    assert "Unsupported model: unsupported-model" in str(e.value)
+    # Should not raise an error, but issue a warning and continue
+    result = GoogleGemini.google_gemini_send_message_command(client_fixture, args)
+    
+    assert isinstance(result, CommandResults)
+    assert result.outputs_key_field == "prompt"
+    assert result.outputs["prompt"] == "Test prompt"
+    assert result.outputs["model"] == "unsupported-model"
 
 
 def test_google_gemini_send_message_command_with_history_string(client_fixture):
